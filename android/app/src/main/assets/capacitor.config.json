@@ -1,0 +1,12 @@
+{
+	"appId": "com.projectrebirth.app",
+	"appName": "PROJECT REBIRTH",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	},
+	"android": {
+		"backgroundColor": "#09090B",
+		"allowMixedContent": false
+	}
+}

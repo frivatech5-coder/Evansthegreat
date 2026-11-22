@@ -1,0 +1,306 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private user settings, XP totals, and personal discipline configuration.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "email": { "type": "string", "maxLength": 160 },
+        "avatarId": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "theme": { "type": "string", "enum": ["dark", "light"] },
+        "dailyLearningGoalHours": { "type": "number" },
+        "notificationsEnabled": { "type": "boolean" },
+        "reminderTime": { "type": "string", "maxLength": 10 },
+        "xp": { "type": "number" },
+        "streakDays": { "type": "number" },
+        "lastActiveDate": { "type": "string", "maxLength": 10 },
+        "totalLearningMinutes": { "type": "number" },
+        "trustedContactName": { "type": "string", "maxLength": 80 },
+        "trustedContactPhone": { "type": "string", "maxLength": 30 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "avatarId", "theme", "xp", "streakDays", "totalLearningMinutes", "createdAt", "updatedAt"]
+    },
+    "DailyMission": {
+      "title": "DailyMission",
+      "description": "User missions across daily, weekly, and monthly cadences.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "pillar": { "type": "string", "enum": ["builder", "faith", "thinker", "discipline"] },
+        "frequency": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
+        "xpReward": { "type": "number" },
+        "completedDates": { "type": "array" },
+        "isCustom": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "pillar", "frequency", "xpReward", "completedDates", "createdAt", "updatedAt"]
+    },
+    "BuilderModuleProgress": {
+      "title": "BuilderModuleProgress",
+      "description": "Completion progress and study notes for one of the 10 Builder curriculum modules.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "moduleKey": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "completedLessons": { "type": "array" },
+        "practiceMinutes": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 8000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "moduleKey", "completedLessons", "practiceMinutes", "notes", "createdAt", "updatedAt"]
+    },
+    "BuilderProject": {
+      "title": "BuilderProject",
+      "description": "User engineering or entrepreneurship project with deadlines, evidence, and milestones.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "techStack": { "type": "string", "maxLength": 200 },
+        "deadline": { "type": "string", "maxLength": 20 },
+        "status": { "type": "string", "enum": ["active", "completed", "paused"] },
+        "evidenceUrl": { "type": "string", "maxLength": 500 },
+        "evidenceNotes": { "type": "string", "maxLength": 2000 },
+        "milestones": { "type": "array" },
+        "hoursLogged": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "status", "milestones", "hoursLogged", "createdAt", "updatedAt"]
+    },
+    "CodingPracticeLog": {
+      "title": "CodingPracticeLog",
+      "description": "Timed or manual coding practice log entry.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "moduleKey": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "topic": { "type": "string", "minLength": 1, "maxLength": 180 },
+        "minutes": { "type": "number" },
+        "date": { "type": "string", "maxLength": 10 },
+        "takeaway": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "moduleKey", "topic", "minutes", "date", "createdAt", "updatedAt"]
+    },
+    "FaithEntry": {
+      "title": "FaithEntry",
+      "description": "Bible study notes, prayer journal, character tracking, and 4-part daily reflection.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "kind": { "type": "string", "enum": ["bible_study", "prayer", "daily_reflection", "character_check"] },
+        "title": { "type": "string", "minLength": 1, "maxLength": 180 },
+        "scriptureRef": { "type": "string", "maxLength": 120 },
+        "content": { "type": "string", "maxLength": 8000 },
+        "question": { "type": "string", "maxLength": 1500 },
+        "lessonLearned": { "type": "string", "maxLength": 2000 },
+        "answered": { "type": "boolean" },
+        "answeredNote": { "type": "string", "maxLength": 1500 },
+        "learnedAboutGod": { "type": "string", "maxLength": 2000 },
+        "didWell": { "type": "string", "maxLength": 2000 },
+        "whereFailed": { "type": "string", "maxLength": 2000 },
+        "improveTomorrow": { "type": "string", "maxLength": 2000 },
+        "characterVirtue": { "type": "string", "maxLength": 60 },
+        "virtueRating": { "type": "number" },
+        "date": { "type": "string", "maxLength": 10 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "kind", "title", "date", "createdAt", "updatedAt"]
+    },
+    "ThinkerEntry": {
+      "title": "ThinkerEntry",
+      "description": "Mental fitness, wealth education, self-discovery, peer pressure independence, and communication records.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "section": { "type": "string", "enum": ["chess", "puzzle", "decision", "finance_tx", "savings_goal", "business_idea", "discovery", "peer_pressure", "communication"] },
+        "title": { "type": "string", "minLength": 1, "maxLength": 180 },
+        "category": { "type": "string", "maxLength": 80 },
+        "amount": { "type": "number" },
+        "targetAmount": { "type": "number" },
+        "txType": { "type": "string", "enum": ["income", "expense", "savings", "none"] },
+        "notes": { "type": "string", "maxLength": 6000 },
+        "date": { "type": "string", "maxLength": 10 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "section", "title", "date", "createdAt", "updatedAt"]
+    },
+    "BattleLog": {
+      "title": "BattleLog",
+      "description": "Habit tracking, private trigger logs, urge victories, and setback reflections without shame.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "entryType": { "type": "string", "enum": ["positive_habit", "urge_victory", "setback_lesson", "emergency_reset"] },
+        "habitName": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "trigger": { "type": "string", "maxLength": 500 },
+        "intensity": { "type": "number" },
+        "alternativeAction": { "type": "string", "maxLength": 500 },
+        "lesson": { "type": "string", "maxLength": 2000 },
+        "completedDates": { "type": "array" },
+        "date": { "type": "string", "maxLength": 10 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "entryType", "habitName", "date", "createdAt", "updatedAt"]
+    },
+    "PlannerBlock": {
+      "title": "PlannerBlock",
+      "description": "Scheduled daily time blocks, priorities, routines, and reminder settings.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "category": { "type": "string", "enum": ["learning", "prayer_bible", "exercise", "responsibility", "rest", "project"] },
+        "startTime": { "type": "string", "minLength": 4, "maxLength": 10 },
+        "endTime": { "type": "string", "minLength": 4, "maxLength": 10 },
+        "date": { "type": "string", "maxLength": 10 },
+        "recurring": { "type": "string", "enum": ["none", "daily", "weekdays", "weekly"] },
+        "completed": { "type": "boolean" },
+        "reminderEnabled": { "type": "boolean" },
+        "priority": { "type": "string", "enum": ["high", "medium", "low"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "category", "startTime", "endTime", "date", "recurring", "completed", "reminderEnabled", "priority", "createdAt", "updatedAt"]
+    },
+    "VaultNote": {
+      "title": "VaultNote",
+      "description": "Private knowledge vault and digital notebook entries.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 180 },
+        "category": { "type": "string", "enum": ["My thoughts", "Bible lessons", "Coding notes", "Business ideas", "Financial lessons", "Life lessons", "Goals", "Personal reflections"] },
+        "content": { "type": "string", "maxLength": 20000 },
+        "tags": { "type": "array" },
+        "pinned": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "category", "content", "tags", "pinned", "createdAt", "updatedAt"]
+    },
+    "MentorChat": {
+      "title": "MentorChat",
+      "description": "Private conversation thread metadata for The Mentor AI assistant.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "mode": { "type": "string", "enum": ["CLEAR MY MIND", "DAILY CHECK-IN", "ACCOUNTABILITY", "FAITH AND WISDOM", "BUSINESS AND WEALTH", "DECISION ROOM", "EMOTIONAL SUPPORT", "CODING GUIDE"] },
+        "title": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "mode", "title", "createdAt", "updatedAt"]
+    },
+    "MentorMessage": {
+      "title": "MentorMessage",
+      "description": "Individual message inside a private Mentor conversation thread.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "role": { "type": "string", "enum": ["user", "assistant"] },
+        "content": { "type": "string", "minLength": 1, "maxLength": 16000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "role", "content", "createdAt"]
+    },
+    "XpEvent": {
+      "title": "XpEvent",
+      "description": "Auditable XP reward entry linked to real discipline actions.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "source": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "pillar": { "type": "string", "enum": ["builder", "faith", "thinker", "discipline", "planner"] },
+        "description": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "maxLength": 10 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "source", "pillar", "description", "amount", "date", "createdAt"]
+    },
+    "UnlockedBadge": {
+      "title": "UnlockedBadge",
+      "description": "Earned achievement badge.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "badgeKey": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "badgeKey", "title", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Root private user profile and discipline counters."
+    },
+    "/users/{userId}/missions/{missionId}": {
+      "schema": { "$ref": "#/entities/DailyMission" },
+      "description": "User daily, weekly, and monthly missions."
+    },
+    "/users/{userId}/builderModules/{moduleId}": {
+      "schema": { "$ref": "#/entities/BuilderModuleProgress" },
+      "description": "Builder pillar curriculum progress and personal notes."
+    },
+    "/users/{userId}/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/BuilderProject" },
+      "description": "Builder pillar engineering and business projects."
+    },
+    "/users/{userId}/codingLogs/{logId}": {
+      "schema": { "$ref": "#/entities/CodingPracticeLog" },
+      "description": "Builder pillar timed and logged coding sessions."
+    },
+    "/users/{userId}/faithEntries/{entryId}": {
+      "schema": { "$ref": "#/entities/FaithEntry" },
+      "description": "Man of God pillar Bible notes, prayers, character, and daily reflections."
+    },
+    "/users/{userId}/thinkerEntries/{entryId}": {
+      "schema": { "$ref": "#/entities/ThinkerEntry" },
+      "description": "Thinker pillar chess, puzzles, wealth ledger, discovery, peer-pressure, and communication logs."
+    },
+    "/users/{userId}/battleLogs/{logId}": {
+      "schema": { "$ref": "#/entities/BattleLog" },
+      "description": "The Battle Room private habit, urge, trigger, and recovery logs."
+    },
+    "/users/{userId}/plannerBlocks/{blockId}": {
+      "schema": { "$ref": "#/entities/PlannerBlock" },
+      "description": "Daily planner time blocks and recurring routines."
+    },
+    "/users/{userId}/vaultNotes/{noteId}": {
+      "schema": { "$ref": "#/entities/VaultNote" },
+      "description": "Journal and Knowledge Vault private notes."
+    },
+    "/users/{userId}/mentorChats/{chatId}": {
+      "schema": { "$ref": "#/entities/MentorChat" },
+      "description": "Private AI Mentor conversation thread headers."
+    },
+    "/users/{userId}/mentorChats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/MentorMessage" },
+      "description": "Individual messages within a private AI Mentor thread."
+    },
+    "/users/{userId}/xpHistory/{xpId}": {
+      "schema": { "$ref": "#/entities/XpEvent" },
+      "description": "XP reward ledger tied to verified actions."
+    },
+    "/users/{userId}/achievements/{badgeId}": {
+      "schema": { "$ref": "#/entities/UnlockedBadge" },
+      "description": "Earned discipline and mastery badges."
+    }
+  }
+}

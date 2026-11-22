@@ -1,0 +1,563 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ---------------------------------------------------------
+    // Global Hardened Primitives
+    // ---------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOptionalString(data, field, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    function isOptionalBool(data, field) {
+      return !(field in data) || (data[field] is bool);
+    }
+
+    function isOptionalNumber(data, field, minVal, maxVal) {
+      return !(field in data) || ((data[field] is int || data[field] is float) && data[field] >= minVal && data[field] <= maxVal);
+    }
+
+    function userDocExists(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId));
+    }
+
+    // ---------------------------------------------------------
+    // Validation Blueprints
+    // ---------------------------------------------------------
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'avatarId', 'theme', 'xp', 'streakDays', 'totalLearningMinutes', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'email', 'avatarId', 'theme', 'dailyLearningGoalHours', 'notificationsEnabled', 'reminderTime', 'xp', 'streakDays', 'lastActiveDate', 'totalLearningMinutes', 'trustedContactName', 'trustedContactPhone', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.uid == request.auth.uid
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80
+        && isOptionalString(data, 'email', 160)
+        && data.avatarId is string && data.avatarId.size() >= 1 && data.avatarId.size() <= 60
+        && data.theme in ['dark', 'light']
+        && isOptionalNumber(data, 'dailyLearningGoalHours', 0.5, 16)
+        && isOptionalBool(data, 'notificationsEnabled')
+        && isOptionalString(data, 'reminderTime', 10)
+        && (data.xp is int || data.xp is float) && data.xp >= 0 && data.xp <= 10000000
+        && (data.streakDays is int || data.streakDays is float) && data.streakDays >= 0 && data.streakDays <= 10000
+        && isOptionalString(data, 'lastActiveDate', 10)
+        && (data.totalLearningMinutes is int || data.totalLearningMinutes is float) && data.totalLearningMinutes >= 0 && data.totalLearningMinutes <= 10000000
+        && isOptionalString(data, 'trustedContactName', 80)
+        && isOptionalString(data, 'trustedContactPhone', 30)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMission(data) {
+      return data.keys().hasAll(['userId', 'title', 'pillar', 'frequency', 'xpReward', 'completedDates', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'title', 'pillar', 'frequency', 'xpReward', 'completedDates', 'isCustom', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.userId == request.auth.uid
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 160
+        && data.pillar in ['builder', 'faith', 'thinker', 'discipline']
+        && data.frequency in ['daily', 'weekly', 'monthly']
+        && (data.xpReward is int || data.xpReward is float) && data.xpReward >= 1 && data.xpReward <= 1000
+        && data.completedDates is list && data.completedDates.size() <= 366
+        && (data.completedDates.size() == 0 || (data.completedDates[0] is string && data.completedDates[0].size() <= 10))
+        && isOptionalBool(data, 'isCustom')
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidBuilderModule(data) {
+      return data.keys().hasAll(['userId', 'moduleKey', 'completedLessons', 'practiceMinutes', 'notes', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'moduleKey', 'completedLessons', 'practiceMinutes', 'notes', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.userId == request.auth.uid
+        && data.moduleKey is string && data.moduleKey.size() >= 1 && data.moduleKey.size() <= 60
+        && data.completedLessons is list && data.completedLessons.size() <= 50
+        && (data.completedLessons.size() == 0 || (data.completedLessons[0] is string && data.completedLessons[0].size() <= 80))
+        && (data.practiceMinutes is int || data.practiceMinutes is float) && data.practiceMinutes >= 0 && data.practiceMinutes <= 1000000
+        && data.notes is string && data.notes.size() <= 8000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidProject(data) {
+      return data.keys().hasAll(['userId', 'title', 'status', 'milestones', 'hoursLogged', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'title', 'description', 'techStack', 'deadline', 'status', 'evidenceUrl', 'evidenceNotes', 'milestones', 'hoursLogged', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.userId == request.auth.uid
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 140
+        && isOptionalString(data, 'description', 2000)
+        && isOptionalString(data, 'techStack', 200)
+        && isOptionalString(data, 'deadline', 20)
+        && data.status in ['active', 'completed', 'paused']
+        && isOptionalString(data, 'evidenceUrl', 500)
+        && isOptionalString(data, 'evidenceNotes', 2000)
+        && data.milestones is list && data.milestones.size() <= 25
+        && (data.milestones.size() == 0 || (
+          data.milestones[0] is map
+          && data.milestones[0].keys().hasAll(['id', 'title', 'done'])
+          && data.milestones[0].keys().hasOnly(['id', 'title', 'done'])
+          && data.milestones[0].id is string && data.milestones[0].id.size() <= 60
+          && data.milestones[0].title is string && data.milestones[0].title.size() <= 160
+          && data.milestones[0].done is bool
+        ))
+        && (data.hoursLogged is int || data.hoursLogged is float) && data.hoursLogged >= 0 && data.hoursLogged <= 100000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCodingLog(data) {
+      return data.keys().hasAll(['userId', 'moduleKey', 'topic', 'minutes', 'date', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'moduleKey', 'topic', 'minutes', 'date', 'takeaway', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.userId == request.auth.uid
+        && data.moduleKey is string && data.moduleKey.size() >= 1 && data.moduleKey.size() <= 60
+        && data.topic is string && data.topic.size() >= 1 && data.topic.size() <= 180
+        && (data.minutes is int || data.minutes is float) && data.minutes >= 1 && data.minutes <= 1440
+        && data.date is string && data.date.size() >= 8 && data.date.size() <= 10
+        && isOptionalString(data, 'takeaway', 2000)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFaithEntry(data) {
+      return data.keys().hasAll(['userId', 'kind', 'title', 'date', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'kind', 'title', 'scriptureRef', 'content', 'question', 'lessonLearned', 'answered', 'answeredNote', 'learnedAboutGod', 'didWell', 'whereFailed', 'improveTomorrow', 'characterVirtue', 'virtueRating', 'date', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.userId == request.auth.uid
+        && data.kind in ['bible_study', 'prayer', 'daily_reflection', 'character_check']
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 180
+        && isOptionalString(data, 'scriptureRef', 120)
+        && isOptionalString(data, 'content', 8000)
+        && isOptionalString(data, 'question', 1500)
+        && isOptionalString(data, 'lessonLearned', 2000)
+        && isOptionalBool(data, 'answered')
+        && isOptionalString(data, 'answeredNote', 1500)
+        && isOptionalString(data, 'learnedAboutGod', 2000)
+        && isOptionalString(data, 'didWell', 2000)
+        && isOptionalString(data, 'whereFailed', 2000)
+        && isOptionalString(data, 'improveTomorrow', 2000)
+        && isOptionalString(data, 'characterVirtue', 60)
+        && isOptionalNumber(data, 'virtueRating', 1, 5)
+        && data.date is string && data.date.size() >= 8 && data.date.size() <= 10
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidThinkerEntry(data) {
+      return data.keys().hasAll(['userId', 'section', 'title', 'date', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'section', 'title', 'category', 'amount', 'targetAmount', 'txType', 'notes', 'date', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.userId == request.auth.uid
+        && data.section in ['chess', 'puzzle', 'decision', 'finance_tx', 'savings_goal', 'business_idea', 'discovery', 'peer_pressure', 'communication']
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 180
+        && isOptionalString(data, 'category', 80)
+        && isOptionalNumber(data, 'amount', 0, 1000000000)
+        && isOptionalNumber(data, 'targetAmount', 0, 1000000000)
+        && (!('txType' in data) || data.txType in ['income', 'expense', 'savings', 'none'])
+        && isOptionalString(data, 'notes', 6000)
+        && data.date is string && data.date.size() >= 8 && data.date.size() <= 10
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidBattleLog(data) {
+      return data.keys().hasAll(['userId', 'entryType', 'habitName', 'date', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'entryType', 'habitName', 'trigger', 'intensity', 'alternativeAction', 'lesson', 'completedDates', 'date', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.userId == request.auth.uid
+        && data.entryType in ['positive_habit', 'urge_victory', 'setback_lesson', 'emergency_reset']
+        && data.habitName is string && data.habitName.size() >= 1 && data.habitName.size() <= 140
+        && isOptionalString(data, 'trigger', 500)
+        && isOptionalNumber(data, 'intensity', 1, 10)
+        && isOptionalString(data, 'alternativeAction', 500)
+        && isOptionalString(data, 'lesson', 2000)
+        && (!('completedDates' in data) || (
+          data.completedDates is list && data.completedDates.size() <= 366
+          && (data.completedDates.size() == 0 || (data.completedDates[0] is string && data.completedDates[0].size() <= 10))
+        ))
+        && data.date is string && data.date.size() >= 8 && data.date.size() <= 10
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPlannerBlock(data) {
+      return data.keys().hasAll(['userId', 'title', 'category', 'startTime', 'endTime', 'date', 'recurring', 'completed', 'reminderEnabled', 'priority', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'title', 'category', 'startTime', 'endTime', 'date', 'recurring', 'completed', 'reminderEnabled', 'priority', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.userId == request.auth.uid
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 160
+        && data.category in ['learning', 'prayer_bible', 'exercise', 'responsibility', 'rest', 'project']
+        && data.startTime is string && data.startTime.size() >= 4 && data.startTime.size() <= 10
+        && data.endTime is string && data.endTime.size() >= 4 && data.endTime.size() <= 10
+        && data.date is string && data.date.size() >= 8 && data.date.size() <= 10
+        && data.recurring in ['none', 'daily', 'weekdays', 'weekly']
+        && data.completed is bool
+        && data.reminderEnabled is bool
+        && data.priority in ['high', 'medium', 'low']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidVaultNote(data) {
+      return data.keys().hasAll(['userId', 'title', 'category', 'content', 'tags', 'pinned', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'title', 'category', 'content', 'tags', 'pinned', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.userId == request.auth.uid
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 180
+        && data.category in ['My thoughts', 'Bible lessons', 'Coding notes', 'Business ideas', 'Financial lessons', 'Life lessons', 'Goals', 'Personal reflections']
+        && data.content is string && data.content.size() <= 20000
+        && data.tags is list && data.tags.size() <= 10
+        && (data.tags.size() == 0 || (data.tags[0] is string && data.tags[0].size() <= 40))
+        && data.pinned is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMentorChat(data) {
+      return data.keys().hasAll(['userId', 'mode', 'title', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'mode', 'title', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && data.userId == request.auth.uid
+        && data.mode in ['CLEAR MY MIND', 'DAILY CHECK-IN', 'ACCOUNTABILITY', 'FAITH AND WISDOM', 'BUSINESS AND WEALTH', 'DECISION ROOM', 'EMOTIONAL SUPPORT', 'CODING GUIDE']
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 140
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMentorMessage(data) {
+      return data.keys().hasAll(['userId', 'role', 'content', 'createdAt'])
+        && data.keys().hasOnly(['userId', 'role', 'content', 'createdAt'])
+        && isValidId(data.userId)
+        && data.userId == request.auth.uid
+        && data.role in ['user', 'assistant']
+        && data.content is string && data.content.size() >= 1 && data.content.size() <= 16000
+        && data.createdAt is timestamp;
+    }
+
+    function isValidXpEvent(data) {
+      return data.keys().hasAll(['userId', 'source', 'pillar', 'description', 'amount', 'date', 'createdAt'])
+        && data.keys().hasOnly(['userId', 'source', 'pillar', 'description', 'amount', 'date', 'createdAt'])
+        && isValidId(data.userId)
+        && data.userId == request.auth.uid
+        && data.source is string && data.source.size() >= 1 && data.source.size() <= 80
+        && data.pillar in ['builder', 'faith', 'thinker', 'discipline', 'planner']
+        && data.description is string && data.description.size() >= 1 && data.description.size() <= 200
+        && (data.amount is int || data.amount is float) && data.amount >= 1 && data.amount <= 5000
+        && data.date is string && data.date.size() >= 8 && data.date.size() <= 10
+        && data.createdAt is timestamp;
+    }
+
+    function isValidBadge(data) {
+      return data.keys().hasAll(['userId', 'badgeKey', 'title', 'createdAt'])
+        && data.keys().hasOnly(['userId', 'badgeKey', 'title', 'createdAt'])
+        && isValidId(data.userId)
+        && data.userId == request.auth.uid
+        && data.badgeKey is string && data.badgeKey.size() >= 1 && data.badgeKey.size() <= 60
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 120
+        && data.createdAt is timestamp;
+    }
+
+    // ---------------------------------------------------------
+    // User Root & Subcollections
+    // ---------------------------------------------------------
+    match /users/{userId} {
+      allow get: if isSignedIn() && isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isVerifiedOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == request.auth.uid
+        && incoming().xp == 0
+        && incoming().streakDays == 0
+        && incoming().totalLearningMinutes == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'avatarId', 'theme', 'dailyLearningGoalHours', 'notificationsEnabled', 'reminderTime', 'trustedContactName', 'trustedContactPhone', 'updatedAt'])
+          || (
+            incoming().diff(existing()).affectedKeys().hasOnly(['xp', 'streakDays', 'lastActiveDate', 'totalLearningMinutes', 'updatedAt'])
+            && incoming().xp >= existing().xp
+            && incoming().totalLearningMinutes >= existing().totalLearningMinutes
+          )
+        );
+      allow delete: if isVerifiedOwner(userId) && isValidId(userId);
+
+      // Missions
+      match /missions/{missionId} {
+        allow get: if isSignedIn() && isOwner(userId) && isValidId(missionId) && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(missionId)
+          && userDocExists(userId)
+          && isValidMission(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(missionId)
+          && isValidMission(incoming())
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['completedDates', 'updatedAt'])
+            || incoming().diff(existing()).affectedKeys().hasOnly(['title', 'pillar', 'frequency', 'xpReward', 'updatedAt'])
+          );
+        allow delete: if isVerifiedOwner(userId) && isValidId(missionId) && existing().userId == request.auth.uid;
+      }
+
+      // Builder Modules
+      match /builderModules/{moduleId} {
+        allow get: if isSignedIn() && isOwner(userId) && isValidId(moduleId) && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(moduleId)
+          && userDocExists(userId)
+          && isValidBuilderModule(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(moduleId)
+          && isValidBuilderModule(incoming())
+          && incoming().userId == existing().userId
+          && incoming().moduleKey == existing().moduleKey
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['completedLessons', 'practiceMinutes', 'notes', 'updatedAt']);
+        allow delete: if isVerifiedOwner(userId) && isValidId(moduleId) && existing().userId == request.auth.uid;
+      }
+
+      // Builder Projects (terminal status lock when completed)
+      match /projects/{projectId} {
+        allow get: if isSignedIn() && isOwner(userId) && isValidId(projectId) && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(projectId)
+          && userDocExists(userId)
+          && isValidProject(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(projectId)
+          && isValidProject(incoming())
+          && existing().status != 'completed'
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['milestones', 'hoursLogged', 'updatedAt'])
+            || incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'techStack', 'deadline', 'status', 'evidenceUrl', 'evidenceNotes', 'milestones', 'hoursLogged', 'updatedAt'])
+          );
+        allow delete: if isVerifiedOwner(userId) && isValidId(projectId) && existing().userId == request.auth.uid;
+      }
+
+      // Coding Practice Logs
+      match /codingLogs/{logId} {
+        allow get: if isSignedIn() && isOwner(userId) && isValidId(logId) && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(logId)
+          && userDocExists(userId)
+          && isValidCodingLog(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(logId)
+          && isValidCodingLog(incoming())
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['topic', 'minutes', 'takeaway', 'updatedAt']);
+        allow delete: if isVerifiedOwner(userId) && isValidId(logId) && existing().userId == request.auth.uid;
+      }
+
+      // Faith Entries (Man of God Pillar)
+      match /faithEntries/{entryId} {
+        allow get: if isSignedIn() && isOwner(userId) && isValidId(entryId) && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(entryId)
+          && userDocExists(userId)
+          && isValidFaithEntry(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(entryId)
+          && isValidFaithEntry(incoming())
+          && incoming().userId == existing().userId
+          && incoming().kind == existing().kind
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['answered', 'answeredNote', 'updatedAt'])
+            || incoming().diff(existing()).affectedKeys().hasOnly(['title', 'scriptureRef', 'content', 'question', 'lessonLearned', 'answered', 'answeredNote', 'learnedAboutGod', 'didWell', 'whereFailed', 'improveTomorrow', 'characterVirtue', 'virtueRating', 'updatedAt'])
+          );
+        allow delete: if isVerifiedOwner(userId) && isValidId(entryId) && existing().userId == request.auth.uid;
+      }
+
+      // Thinker Entries
+      match /thinkerEntries/{entryId} {
+        allow get: if isSignedIn() && isOwner(userId) && isValidId(entryId) && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(entryId)
+          && userDocExists(userId)
+          && isValidThinkerEntry(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(entryId)
+          && isValidThinkerEntry(incoming())
+          && incoming().userId == existing().userId
+          && incoming().section == existing().section
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'amount', 'targetAmount', 'txType', 'notes', 'updatedAt']);
+        allow delete: if isVerifiedOwner(userId) && isValidId(entryId) && existing().userId == request.auth.uid;
+      }
+
+      // Battle Logs
+      match /battleLogs/{logId} {
+        allow get: if isSignedIn() && isOwner(userId) && isValidId(logId) && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(logId)
+          && userDocExists(userId)
+          && isValidBattleLog(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(logId)
+          && isValidBattleLog(incoming())
+          && incoming().userId == existing().userId
+          && incoming().entryType == existing().entryType
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['completedDates', 'updatedAt'])
+            || incoming().diff(existing()).affectedKeys().hasOnly(['habitName', 'trigger', 'intensity', 'alternativeAction', 'lesson', 'updatedAt'])
+          );
+        allow delete: if isVerifiedOwner(userId) && isValidId(logId) && existing().userId == request.auth.uid;
+      }
+
+      // Planner Blocks
+      match /plannerBlocks/{blockId} {
+        allow get: if isSignedIn() && isOwner(userId) && isValidId(blockId) && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(blockId)
+          && userDocExists(userId)
+          && isValidPlannerBlock(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(blockId)
+          && isValidPlannerBlock(incoming())
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['completed', 'updatedAt'])
+            || incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'startTime', 'endTime', 'date', 'recurring', 'completed', 'reminderEnabled', 'priority', 'updatedAt'])
+          );
+        allow delete: if isVerifiedOwner(userId) && isValidId(blockId) && existing().userId == request.auth.uid;
+      }
+
+      // Knowledge Vault Notes
+      match /vaultNotes/{noteId} {
+        allow get: if isSignedIn() && isOwner(userId) && isValidId(noteId) && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(noteId)
+          && userDocExists(userId)
+          && isValidVaultNote(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(noteId)
+          && isValidVaultNote(incoming())
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['pinned', 'updatedAt'])
+            || incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'content', 'tags', 'pinned', 'updatedAt'])
+          );
+        allow delete: if isVerifiedOwner(userId) && isValidId(noteId) && existing().userId == request.auth.uid;
+      }
+
+      // Mentor Chats & Messages Subcollection
+      match /mentorChats/{chatId} {
+        allow get: if isSignedIn() && isOwner(userId) && isValidId(chatId) && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(chatId)
+          && userDocExists(userId)
+          && isValidMentorChat(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(chatId)
+          && isValidMentorChat(incoming())
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'mode', 'updatedAt']);
+        allow delete: if isVerifiedOwner(userId) && isValidId(chatId) && existing().userId == request.auth.uid;
+
+        match /messages/{messageId} {
+          allow get: if isSignedIn() && isOwner(userId) && isValidId(chatId) && isValidId(messageId)
+            && get(/databases/$(database)/documents/users/$(userId)/mentorChats/$(chatId)).data.userId == request.auth.uid;
+          allow list: if isSignedIn() && isOwner(userId) && resource.data.userId == request.auth.uid;
+          allow create: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(chatId) && isValidId(messageId)
+            && get(/databases/$(database)/documents/users/$(userId)/mentorChats/$(chatId)).data.userId == request.auth.uid
+            && isValidMentorMessage(incoming())
+            && incoming().createdAt == request.time;
+          allow update: if false;
+          allow delete: if isVerifiedOwner(userId) && isValidId(chatId) && isValidId(messageId)
+            && existing().userId == request.auth.uid;
+        }
+      }
+
+      // XP History (append-only)
+      match /xpHistory/{xpId} {
+        allow get: if isSignedIn() && isOwner(userId) && isValidId(xpId) && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(xpId)
+          && userDocExists(userId)
+          && isValidXpEvent(incoming())
+          && incoming().createdAt == request.time;
+        allow update: if false;
+        allow delete: if isVerifiedOwner(userId) && isValidId(xpId) && existing().userId == request.auth.uid;
+      }
+
+      // Achievement Badges (append-only)
+      match /achievements/{badgeId} {
+        allow get: if isSignedIn() && isOwner(userId) && isValidId(badgeId) && existing().userId == request.auth.uid;
+        allow list: if isSignedIn() && isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isVerifiedOwner(userId) && isValidId(userId) && isValidId(badgeId)
+          && userDocExists(userId)
+          && isValidBadge(incoming())
+          && incoming().createdAt == request.time;
+        allow update: if false;
+        allow delete: if isVerifiedOwner(userId) && isValidId(badgeId) && existing().userId == request.auth.uid;
+      }
+    }
+  }
+}
